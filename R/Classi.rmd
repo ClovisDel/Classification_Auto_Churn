@@ -1,0 +1,215 @@
+---
+title: 
+author: 
+- Clovis Deletre
+date:
+output:
+  rmarkdown::html_document:
+    theme: cerulean
+    number_sections: no
+    toc: yes
+    toc_depth: 5
+    toc_float: true
+---
+
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 20px;
+  }
+td {  /* Table  */
+  font-size: 8px;
+}
+h1.title {
+  font-size: 55px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 38px;
+  color: DarkBlue;
+}
+h2 { /* Header 2 */
+    font-size: 38px;
+  color: DarkBlue;
+}
+h3 { /* Header 3 */
+  font-size: 35px;
+  font-family: "Times New Roman", Times, serif;
+  color: DarkBlue;
+}
+code.r{ /* Code block */
+    font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#install for export in pdf file
+#tinytex::install_tinytex()
+```
+
+```{r}
+
+```
+
+
+## Import de la base de donnée | format csv 
+
+```{r}
+data<-read.csv(file="telecom_churn_data.csv",header=TRUE,sep=",")
+head(data)
+```
+
+## Début de la préparation des données, étapes essentielles [rajouter blablabla]
+
+Commencons par controler la structure de la base de donnée : 
+```{r}
+str(data)
+```
+Que des valeurs numériques: 
+On créer un dataset avec les 214 variables numériques
+On créer un df avec les valeurs char (qui sont les dates, donc pas utile)
+```{r}
+library(dplyr)
+dataset <- data %>% select_if(is.numeric)
+character <-data %>% select_if(is.character)
+
+
+```
+
+On regarde si on a des doublons (deux fois le même client), on vérifie que chaque numéro de téléphone est unique : 
+```{r}
+
+length(unique(dataset$mobile_number)) == nrow(dataset)
+
+```
+Ici c'est le cas, donc on n'a pas de doublon. 
+
+
+Suppressions des variables avec un nbr de NA > 10% S
+```{r}
+
+library(funModeling)
+df_status(dataset)
+
+dim(dataset)
+
+b <- 0
+for (i in 1:ncol(dataset)){
+  #print(names(dataset)[i])
+  #print(sum(is.na(dataset[,i]))/ nrow(dataset))
+  if(sum(is.na(dataset[,i-b]))/ nrow(dataset) > 0.1){
+    #print(i-b)
+    #print(b)
+    print(names(dataset)[i-b])
+    print(sum(is.na(dataset[,i-b]))/ nrow(dataset))
+    dataset <- dataset[,-(i-b)]
+    b <- b + 1
+  }
+}
+
+dim(dataset)
+df_status(dataset)
+```
+En supprimant toutes les variables qui ont + de 10% de NAN on passe de 214 à 178 variables. 
+
+
+Transformations pour les autres NAN. 
+```{r}
+dim(dataset)
+
+for (i in 1:ncol(dataset)){
+  dataset[,i][is.na(dataset[,i])] <- median(dataset[,i], na.rm = T)
+}
+
+sum(is.na(dataset))
+```
+
+supprimer les lignes des valeurs aberrantes 
+```{r}
+
+#pinf = 0.025 
+#psup = 0.975
+#binf <- quantile(dataset$arpu_6, pinf)
+#binf 
+#bsup <- quantile(dataset$arpu_6, psup)
+#bsup
+
+#outlier_idx <- which(dataset$arpu_6 < binf | dataset$arpu_6 > bsup) 
+#outlier_idx
+
+
+
+
+#k= 10
+#binf <- median(dataset$arpu_6) - k * mad (dataset$arpu_6) 
+#binf 
+#bsup <- median(dataset$arpu_6) + k * mad (dataset$arpu_6) 
+#bsup
+#outlier_idx <- which(dataset$arpu_6 < binf | dataset$arpu_6 > bsup) 
+#outlier_idx
+
+
+
+
+#library(outliers) 
+#grubbs.test(dataset$arpu_6)
+#grubbs.test(dataset$arpu_6, opposite = T)
+
+
+
+
+#Méthode à l'aide des boxplot :
+#
+# Bilan, en une heure seulement 13 variables traités et suppression de 40000 données -> mauvaise méthode
+
+#debut <- Sys.time()
+#for(i in 1:178){
+#  print(i)
+#  out <- boxplot.stats(dataset[,i])$out
+#  out_ind <- which(dataset[,i] %in% c(out))
+#  #out_ind
+#  length(out_ind)
+#  b <- 0
+#  for(j in out_ind){
+#    #print(length(out_ind)-b)
+#    dataset <- dataset[-(j-b),]
+#    b <- b + 1
+#  }
+#  print(Sys.time()-debut)
+#}
+#TempsTraitement <- Sys.time() - debut
+#print(paste("Pour générer un arbre, il faut : ", TempsTraitement))
+
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
