@@ -1,0 +1,133 @@
+---
+title: 
+author: 
+- Clovis Deletre
+date:
+output:
+  rmarkdown::html_document:
+    theme: cerulean
+    number_sections: no
+    toc: yes
+    toc_depth: 5
+    toc_float: true
+---
+
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 20px;
+  }
+td {  /* Table  */
+  font-size: 8px;
+}
+h1.title {
+  font-size: 55px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 38px;
+  color: DarkBlue;
+}
+h2 { /* Header 2 */
+    font-size: 38px;
+  color: DarkBlue;
+}
+h3 { /* Header 3 */
+  font-size: 35px;
+  font-family: "Times New Roman", Times, serif;
+  color: DarkBlue;
+}
+code.r{ /* Code block */
+    font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#install for export in pdf file
+#tinytex::install_tinytex()
+```
+
+```{r}
+
+```
+
+
+http://www.sthda.com/french/articles/38-methodes-des-composantes-principales-dans-r-guide-pratique/73-acp-analyse-en-composantes-principales-avec-r-l-essentiel/
+http://factominer.free.fr/factomethods/analyse-en-composantes-principales.html
+
+
+
+
+SVM
+
+https://www.geeksforgeeks.org/classifying-data-using-support-vector-machinessvms-in-r/
+
+https://www.datacamp.com/community/tutorials/support-vector-machines-r
+
+
+
+
+
+## Import des deux jeux de données | format csv 
+
+```{r}
+train<-read.csv(file="churner_train_data_set.csv",header=TRUE,sep=",")
+head(train)
+
+test<-read.csv(file="churner_test_data_set.csv",header=TRUE,sep=",")
+head(test)
+```
+
+scale.unit: pour choisir de réduire ou non les variables
+ncp: le nombre de dimensions à garder dans les résultats
+graph: pour choisir de faire apparaître les graphiques ou non 
+
+```{r}
+library(FactoMineR)
+library("factoextra")
+res.pca = PCA(train[,2:132], scale.unit=TRUE, ncp=131, graph=T)
+
+```
+
+```{r}
+plot.PCA(res.pca, axes=c(1, 2), choix="ind", habillage=5,label="var",graph.type = "ggplot")
+```
+
+```{r}
+res.pca$eig
+```
+
+On utilise les valeurs propres pour déterminer le nombre p' d'axes principaux à conserver après l'ACP avec la règle de Kaiser (1961)
+
+- On prend les valeurs propre > 1, impliquant que la composante va représenté plus de variance par rapport à une seule variable d'origine 
+
+- On prend un ensemble de valeurs propres qui ont une variance cumulée d'au moins 70%
+
+Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
+
+```{r}
+res.pca$ind$coord
+
+```
+
+On obitent une base train de 24 variables pour 79999 observations
+```{r}
+trainACP <- as.data.frame(res.pca$ind$coord[,1:24])
+y = scale(train[,133])
+trainACP <- cbind(trainACP, y)
+
+```
+
+```{r}
+library(e1071)
+svmfit = svm(y ~ ., data = trainACP, kernel = "linear", cost = 10, scale = FALSE)
+print(svmfit)
+
+```
+
