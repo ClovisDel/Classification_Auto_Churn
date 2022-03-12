@@ -91,7 +91,19 @@ graph: pour choisir de faire apparaître les graphiques ou non
 ```{r}
 library(FactoMineR)
 library("factoextra")
+
+#on prend churner en valeur qualitative
+res.pca = PCA(train[,2:133], scale.unit=TRUE,quali.sup = 132 , ncp=131, graph=T)
+```
+
+
+```{r}
+library(FactoMineR)
+library("factoextra")
+
+#ACP en excluant la collone d'identification de l'individu ainsi que la variable à expliquée.
 res.pca = PCA(train[,2:132], scale.unit=TRUE, ncp=131, graph=T)
+res.pca.test = PCA(test[,2:132], scale.unit=TRUE, ncp=131, graph=T)
 
 ```
 
@@ -107,7 +119,10 @@ On utilise les valeurs propres pour déterminer le nombre p' d'axes principaux �
 
 - On prend les valeurs propre > 1, impliquant que la composante va représenté plus de variance par rapport à une seule variable d'origine 
 
-- On prend un ensemble de valeurs propres qui ont une variance cumulée d'au moins 70%
+- On prend un ensemble de valeurs propres qui ont une variance cumulée d'au moins 70% (explique au moins 70% de l'inertie)
+
+
+
 
 Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
 
@@ -115,19 +130,159 @@ Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
 res.pca$ind$coord
 
 ```
+```{r}
+fviz_eig(res.pca)
+```
+```{r}
+sujetVar <- get_pca_var(res.pca)
+
+#qualité de répresentation
+head(sujetVar$cos2)
+```
+
+```{r}
+#qualité par axes coloré :
+fviz_pca_var(res.pca, col.var = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE)
+
+
+#top 5 des variables explicatives du premier axe
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 5)
+```
+```{r}
+#tracage d'ellypse de confiance
+
+train$groupe <- ifelse(train$churner ==1 ,TRUE,FALSE)
+test$groupe <- ifelse(test$churner ==1 ,TRUE,FALSE)
+
+fviz_pca_ind(res.pca, geom.ind = "point", col.ind = train$groupe, 
+             palette = c("#00AFBB", "#E7B800", "#FC4E07","#9bcd9b"),
+             addEllipses = TRUE, ellipse.type = "confidence",
+             legend.title = "continents"
+)
+```
+
 
 On obitent une base train de 24 variables pour 79999 observations
 ```{r}
 trainACP <- as.data.frame(res.pca$ind$coord[,1:24])
-y = scale(train[,133])
+testACP <- as.data.frame(res.pca.test$ind$coord[,1:24])
+
+y = train[,134]
+y.test = test[,134]
+
+
 trainACP <- cbind(trainACP, y)
+testACP <- cbind(testACP, y.test)
 
 ```
+
+
+
+Création d'un tableau pour afficher les performances des différents SVM selon les paramètres
+```{r}
+N <- 10  # nombre de lignes
+
+Tableau_Resultat_SVM <- data.frame( type=rep("", N),
+                                    kernel=rep("", N), 
+                                    BestCost=rep(NA, N),
+                                    BestGamma=rep(NA, N),
+                                    Accuracy_Training=rep(NA, N),
+                                    Kappa__Training=rep(NA, N),
+                 stringsAsFactors=FALSE)          
+
+
+#svmfit_normal   = svm(formula = y~.,
+ #                data = trainACP,
+  #              type = 'C-classification',
+     #          kernel = 'linear')
+
+
+
+
+```
+
+
+2 mesures de performances intéressantes :  Accuracy & Kappa.
+
+Kappa est utile lorsque la proportion des classes est différentes, ce paramètre nous permet de mettre en perspective notre Accuracy.
+
+http://john-uebersax.com/stat/kappa.htm
 
 ```{r}
 library(e1071)
-svmfit = svm(y ~ ., data = trainACP, kernel = "linear", cost = 10, scale = FALSE)
-print(svmfit)
+library(caret)
+ 
+
+
+
+svm_para <- function( type , kernel) 
+{
+  
+  svmfit <- tune.svm(x = trainACP[, -25],
+                   y = trainACP[, 25], 
+                type = type, 
+              kernel = kernel,
+                cost = 1:10, 
+               gamma = seq(0,0.5,by=0.1),
+              tunecontrol=tune.control(cross=8)
+              )
+    Resultat <- list(6)
+    Resultat[1] <- type
+    Resultat[2] <- kernel
+    Resultat[3] <- svmfit$best.parameters$cost
+    Resultat[4] <- svmfit$best.parameters$gamma
+    
+    
+    SVM_pred_training = predict(svmfit$best.model, x = trainACP[, -25],y = trainACP[, 25])
+    
+    MatriceConfu_SVM_train <- confusionMatrix( table ( SVM_pred_training, trainACP[,25] ))
+    Resultat[5:6] <- MatriceConfu_SVM_train $overall[1:2]
+
+    return ( Resultat )
+}
+
+
+
+
+
+#type
+type_liste <- c("C-classification",
+                "nu-classification",
+                "one-classification"
+          #      "eps-regression",
+           #     "nu-regression"
+                )
+
+#kernel
+kernel_liste <- c("linear", "polynomial", "radial", "sigmoid")
+#coupure
+saut_list <- c(1,2,3,4,5)
+
+i=1
+
+for(x in seq_along(type_liste)){
+for(y in seq_along(kernel_liste)) {
+  print("----------------")
+  print(type_liste[x])
+  print(kernel_liste[y])
+  
+  #nu classification uniquement compatible avec un kernel linéaire
+  if(!( x ==2 && y !=1 )){
+  #one classification pas compatible avec kernel polynomial
+    if(!( x ==3 && y ==2 )){
+    
+
+    
+  Tableau_Resultat_SVM[i, ] <- svm_para(type_liste[x],kernel_liste[y])
+i <- i+1}}
+
+}}
+
+
+Tableau_Resultat_SVM
 
 ```
+
+
+
 
