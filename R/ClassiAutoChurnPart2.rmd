@@ -1,7 +1,10 @@
 ---
-title: 
+title: |
+  ![](images/svm.png){width=20%} 
+  Partie 2 sur R
 author: 
 - Clovis Deletre
+- Charles Vitry
 date:
 output:
   rmarkdown::html_document:
@@ -11,7 +14,6 @@ output:
     toc_depth: 5
     toc_float: true
 ---
-
 <style type="text/css">
 
 body{ /* Normal  */
@@ -29,7 +31,7 @@ h1 { /* Header 1 */
   color: DarkBlue;
 }
 h2 { /* Header 2 */
-    font-size: 38px;
+    font-size: 28px;
   color: DarkBlue;
 }
 h3 { /* Header 3 */
@@ -45,74 +47,122 @@ pre { /* Code block - determines code spacing between lines */
 }
 </style>
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 #install for export in pdf file
 #tinytex::install_tinytex()
 ```
+<br> </br>
 
+
+
+
+
+<br> </br>
+
+
+# Introduction
+<br> </br>
+Import des deux jeux de données | format csv 
 ```{r}
+train <-
+  read.csv(file = "churner_train_data_set.csv", header = TRUE, sep = ",")
+#head(train)
 
+test <- read.csv(file = "churner_test_data_set.csv", header = TRUE, sep =
+                   ",")
+#head(test)
 ```
-
-
-http://www.sthda.com/french/articles/38-methodes-des-composantes-principales-dans-r-guide-pratique/73-acp-analyse-en-composantes-principales-avec-r-l-essentiel/
-http://factominer.free.fr/factomethods/analyse-en-composantes-principales.html
-
-
-
-
-SVM
-
-https://www.geeksforgeeks.org/classifying-data-using-support-vector-machinessvms-in-r/
-
-https://www.datacamp.com/community/tutorials/support-vector-machines-r
-
-
-
-
-
-## Import des deux jeux de données | format csv 
-
+<br> </br>
+Création variables
 ```{r}
-train<-read.csv(file="churner_train_data_set.csv",header=TRUE,sep=",")
-head(train)
-
-test<-read.csv(file="churner_test_data_set.csv",header=TRUE,sep=",")
-head(test)
+train$groupe <- ifelse(train$churner == 1 , TRUE, FALSE)
+test$groupe <- ifelse(test$churner == 1 , TRUE, FALSE)
 ```
+<br> </br>    
+<br> </br>
+<br> </br>
+
+# ACP sur Jeu d'entrainement
+<br> </br>
 
 scale.unit: pour choisir de réduire ou non les variables
 ncp: le nombre de dimensions à garder dans les résultats
 graph: pour choisir de faire apparaître les graphiques ou non 
-
-```{r}
+```{r,fig.show='hide',warning=FALSE}
 library(FactoMineR)
 library("factoextra")
 
-#on prend churner en valeur qualitative
-res.pca = PCA(train[,2:133], scale.unit=TRUE,quali.sup = 132 , ncp=131, graph=T)
+#Test d'une ACP en prenant churner en variable qualitative
+res.pca = PCA(
+  train[, 2:133],
+  scale.unit = TRUE,
+  quali.sup = 132 ,
+  ncp = 131,
+  graph = T
+)
+
 ```
+<br> </br>
 
+## Création de l'ACP
 
-```{r}
+```{r,fig.show='hide',warning=FALSE}
 library(FactoMineR)
 library("factoextra")
 
 #ACP en excluant la collone d'identification de l'individu ainsi que la variable à expliquée.
-res.pca = PCA(train[,2:132], scale.unit=TRUE, ncp=131, graph=T)
-res.pca.test = PCA(test[,2:132], scale.unit=TRUE, ncp=131, graph=T)
+#res.pca = PCA(train[,2:132], scale.unit=TRUE, ncp=131, graph=T)
+
+
+#mauvaise méthode, faire l'ACP sur les données à tester n'a aucun sens, 
+#en effet, pour estimer le prix d'un contrat, on ne peut pas attendre que 5000 clients attendent l'estimation de leur contrat
+#il faut projeter les nouvelles données avec l'ACP effectué sur le jeu d'entrainement.
+#res.pca.test = PCA(test[,2:132], scale.unit=TRUE, ncp=131, graph=T)
+
+
+library(ade4)
+res.pca <- dudi.pca(train[,2:132],
+                    scannf = FALSE,   # Cacher le scree plot
+                    nf = 131            # Nombre d'axes gardés
+                    )
 
 ```
+<br> </br>
 
+## Visualisation
+
+<br> </br>
+Affichage des individus
 ```{r}
-plot.PCA(res.pca, axes=c(1, 2), choix="ind", habillage=5,label="var",graph.type = "ggplot")
+#plot.PCA(res.pca, axes=c(1, 2), choix="ind", habillage=5,label="var",graph.type = "ggplot")
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     
+             )
 ```
+<br> </br>
+<br> </br>
+<br> </br>
 
+## Sélection du nombre d'axes
+
+<br> </br>
+Observons l'inertie expliqué
 ```{r}
-res.pca$eig
+#head(res.pca$eig)
+screeplot(res.pca, main = "Valeurs propres")
+fviz_eig(res.pca)
+
+library(factoextra)
+# Valeurs propres
+vp <- get_eigenvalue(res.pca)
+head(vp)
+
+
+
 ```
 
 On utilise les valeurs propres pour déterminer le nombre p' d'axes principaux à conserver après l'ACP avec la règle de Kaiser (1961)
@@ -123,166 +173,363 @@ On utilise les valeurs propres pour déterminer le nombre p' d'axes principaux �
 
 
 
-
+<br> </br>
 Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
 
 ```{r}
-res.pca$ind$coord
+# #res.pca$ind$coord
+# 
+# #Variables
+# res.var <- get_pca_var(res.pca)
+# 
+# # Coordonnées
+# #head(res.var$coord  )
+# 
+# # Contributions aux axes
+# #head(res.var$contrib   )
+# 
+# # Qualité de représentation 
+# head(res.var$cos2  )
+# 
+# #Isndividus
+# res.ind <- get_pca_ind(res.pca)
+# 
+# # Coordonnées
+# #head(res.ind$coord )
+# 
+# # Contributions aux axes
+# #head(res.ind$contrib )
+# 
+# # Qualité de représentation
+# head(res.ind$cos2  )         
+# ```
+
 
 ```
-```{r}
-fviz_eig(res.pca)
-```
-```{r}
+<br> </br>
+
+
+## Qualité
+
+<br> </br>
+qualité de répresentation
+```{r,results='hide'}
 sujetVar <- get_pca_var(res.pca)
 
-#qualité de répresentation
 head(sujetVar$cos2)
 ```
-
+<br> </br>
+Qualité par axes coloré 
 ```{r}
-#qualité par axes coloré :
-fviz_pca_var(res.pca, col.var = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE)
+fviz_pca_var(
+  res.pca,
+  col.var = "cos2",
+  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+  repel = TRUE
+)
 
-
-#top 5 des variables explicatives du premier axe
-fviz_contrib(res.pca, choice = "var", axes = 1, top = 5)
 ```
+<br> </br>
+
+<br> </br>
+<br> </br>
+
+Top 5 des variables explicatives du premier axe
 ```{r}
-#tracage d'ellypse de confiance
 
-train$groupe <- ifelse(train$churner ==1 ,TRUE,FALSE)
-test$groupe <- ifelse(test$churner ==1 ,TRUE,FALSE)
+#
+fviz_contrib(res.pca,
+             choice = "var",
+             axes = 1,
+             top = 5)
+```
 
-fviz_pca_ind(res.pca, geom.ind = "point", col.ind = train$groupe, 
-             palette = c("#00AFBB", "#E7B800", "#FC4E07","#9bcd9b"),
-             addEllipses = TRUE, ellipse.type = "confidence",
-             legend.title = "continents"
+<br> </br>
+
+
+
+Tracage d'ellypse de confiance
+```{r}
+
+
+fviz_pca_ind(
+  res.pca,
+  geom.ind = "point",
+  col.ind = train$groupe,
+  palette = c("#00AFBB", "#E7B800", "#FC4E07", "#9bcd9b"),
+  addEllipses = TRUE,
+  ellipse.type = "confidence",
+  legend.title = "continents"
 )
 ```
+<br> </br>
 
+# ACP sur jeu de test
 
-On obitent une base train de 24 variables pour 79999 observations
+<br> </br>
+
+On projette les données du jeu test avec l'ACP effectué sur le jeu d'entrainement.
 ```{r}
-trainACP <- as.data.frame(res.pca$ind$coord[,1:24])
-testACP <- as.data.frame(res.pca.test$ind$coord[,1:24])
+library(ade4)
+ACPsurTest <- suprow(res.pca, test[,2:132])$lisup
 
-y = train[,134]
-y.test = test[,134]
+```
+<br> </br>
+
+Visualisation projection des nouveaux individus
+```{r}
+#plot des obs train
+plot <- fviz_pca_ind(res.pca, repel = TRUE)
+
+#plot des obs de test
+fviz_add(plot, ACPsurTest, color ="purple")
+```
+<br> </br>
+<br> </br>
+
+On obtient une base train de 24 variables pour 79999 observations
+```{r}
+trainACP <- as.data.frame(
+ # res.pca$ind$coord[, 1:24]
+  res.pca$li[, 1:24]
+  )
+testACP <- ACPsurTest[, 1:24]
+
+
+
+y = train[, 134]
+y.test = test[, 134]
 
 
 trainACP <- cbind(trainACP, y)
 testACP <- cbind(testACP, y.test)
 
-```
 
+```
+<br> </br>
+
+
+# SVM
+
+<br> </br>
+
+## Introduction
+
+<br> </br>
+
+SVM utilisé en tant que classifieur permet de trouver un ligne (R²), un plan (R^3), un hyperplan (R^n) qui sépare les observations en classes.
+
+Dans le cas du SVM linaéaire binaire on séparer linéairement une Classe +1 et une Classe -1, 
+Une infinité de solutions est possible pour ces problèmes,on cherche la solution qui maximise la marge et minimise les erreurs.
+
+Cependant lors de la recherche des points supports, les outliers(valeurs abérantes) vont faire perdre toute généralisation au modèle,
+pour contrer cela on accepte alors des erreurs, on change de classe les outliers.
+
+
+<br> </br>
+
+## Création SVM
+
+<br> </br>
+
+Fonction création d'un SVM
+```{r}
+svm_para <- function(type , kernel)
+{
+  library(e1071)
+
+  svmfit <- tune.svm(
+    x = trainACP[,-25],
+    y = trainACP[, 25],
+    type = type,
+    kernel = kernel,
+    cost = 1:10,
+    #on peut faire bien plus
+    gamma = seq(0, 0.5, by = 0.1),
+    tunecontrol = tune.control(cross = 8)
+  )
+  return (svmfit)
+}
+```
+les paramètres différentiant les SVM : le type de classifieur & la fonction kernel utilisé.
+
+<br> </br>
+
+<br> </br>
+
+## Critères de comparaison des SVM
+
+<br> </br>
+
+Fonction d'évaluation d'un SVM
+```{r}
+Performances_SVM <- function(svmfit,type,kernel)
+{
+  library(caret)
+  Resultat <- list(7)
+  Resultat[1] <- type
+  Resultat[2] <- kernel
+  Resultat[3] <- svmfit$best.parameters$cost
+  Resultat[4] <- svmfit$best.parameters$gamma
+
+  #Prédictions
+  SVM_pred_training = predict(svmfit$best.model, newdata  = trainACP[,-25]) 
+  SVM_pred_testing = predict(svmfit$best.model, newdata  = testACP[,-25] )
+
+  #Matrices de confusion train et test
+  MatriceConfu_SVM_train <-
+    confusionMatrix(table (SVM_pred_training, trainACP[, 25]))
+  MatriceConfu_SVM_test <-
+    confusionMatrix(table (SVM_pred_testing, testACP[, 25]))
+  
+  #retour de résultat des matrices de confusions
+  Resultat[5:6] <- MatriceConfu_SVM_train$overall[1:2]
+  Resultat[7:9] <- MatriceConfu_SVM_train$byClass[c("Sensitivity","Specificity","Balanced Accuracy")]
+  
+  Resultat[10:11] <- MatriceConfu_SVM_test$overall[1:2]
+  Resultat[12:14] <-MatriceConfu_SVM_test$byClass[c("Sensitivity","Specificity","Balanced Accuracy")]
+
+  Resultat[15] <- svmfit$best.model$tot.nSV
+  
+  return (Resultat)
+}
+```
+On créé une liste contenant les différentes mesures de performances pour le jeu d'entrainement Et le jeu de test.
+
+Kappa, Sensitivity, Specificity et Balanced Accuracy sont très utiles dans notre cas puisque la proportion des classes est très différentes, ces paramètres nous permettent de mettre en perspective notre Accuracy.
+
+http://john-uebersax.com/stat/kappa.htm
+
+<br> </br>
 
 
 Création d'un tableau pour afficher les performances des différents SVM selon les paramètres
 ```{r}
-N <- 10  # nombre de lignes
+N <- 8  # nombre de lignes
 
-Tableau_Resultat_SVM <- data.frame( type=rep("", N),
-                                    kernel=rep("", N), 
-                                    BestCost=rep(NA, N),
-                                    BestGamma=rep(NA, N),
-                                    Accuracy_Training=rep(NA, N),
-                                    Kappa__Training=rep(NA, N),
-                 stringsAsFactors=FALSE)          
+Tableau_Resultat_SVM <- data.frame(
+  type = rep("", N),
+  kernel = rep("", N),
+  BestCost = rep(NA, N),
+  BestGamma = rep(NA, N),
+  
+  Accuracy_Training = rep(NA, N),
+  Kappa__Training = rep(NA, N),
+  Sensitivity_Training = rep(NA, N),
+  Specificity_Training = rep(NA, N),
+  Balanced_Accuracy_Training = rep(NA, N),
+  
+  Accuracy_Testing = rep(NA, N),
+  Kappa__Testing = rep(NA, N),
+  Sensitivity_Testing = rep(NA, N),
+  Specificity_Testing = rep(NA, N),
+  Balanced_Accuracy_Testing = rep(NA, N),
+  
+  
+  Nombre_De_Vecteur_Support = rep(NA, N),
+  stringsAsFactors = FALSE
+)
 
 
 #svmfit_normal   = svm(formula = y~.,
- #                data = trainACP,
-  #              type = 'C-classification',
-     #          kernel = 'linear')
-
-
+#                data = trainACP,
+#              type = 'C-classification',
+#          kernel = 'linear')
 
 
 ```
 
 
-2 mesures de performances intéressantes :  Accuracy & Kappa.
+<br> </br>
 
-Kappa est utile lorsque la proportion des classes est différentes, ce paramètre nous permet de mettre en perspective notre Accuracy.
 
-http://john-uebersax.com/stat/kappa.htm
+## Comparaison des SVM
 
+
+<br> </br>
+On créé deux vecteurs, l'un contenant tout les types de classifieur & l'autre contenant les fonctions kernel possible.
+
+On test toute les combinaisons possibles en appelant notre fonction de création de SVM, puis on évalue le modèle avec la fonction d'évaluation de SVM. On sauvegarde ces performances dans le tableau, et si le modèle a une meilleure Balanced Accuracy que le meilleur actuel, on affecte ce modèle au meilleur.
 ```{r}
-library(e1071)
-library(caret)
- 
-
-
-
-svm_para <- function( type , kernel) 
-{
-  
-  svmfit <- tune.svm(x = trainACP[, -25],
-                   y = trainACP[, 25], 
-                type = type, 
-              kernel = kernel,
-                cost = 1:10, 
-               gamma = seq(0,0.5,by=0.1),
-              tunecontrol=tune.control(cross=8)
-              )
-    Resultat <- list(6)
-    Resultat[1] <- type
-    Resultat[2] <- kernel
-    Resultat[3] <- svmfit$best.parameters$cost
-    Resultat[4] <- svmfit$best.parameters$gamma
-    
-    
-    SVM_pred_training = predict(svmfit$best.model, x = trainACP[, -25],y = trainACP[, 25])
-    
-    MatriceConfu_SVM_train <- confusionMatrix( table ( SVM_pred_training, trainACP[,25] ))
-    Resultat[5:6] <- MatriceConfu_SVM_train $overall[1:2]
-
-    return ( Resultat )
-}
-
-
-
-
-
 #type
 type_liste <- c("C-classification",
                 "nu-classification",
                 "one-classification"
-          #      "eps-regression",
-           #     "nu-regression"
+                #      "eps-regression",
+                #     "nu-regression"
                 )
-
+                
 #kernel
-kernel_liste <- c("linear", "polynomial", "radial", "sigmoid")
-#coupure
-saut_list <- c(1,2,3,4,5)
+kernel_liste <-
+  c("linear", "polynomial", "radial", "sigmoid")
 
-i=1
 
-for(x in seq_along(type_liste)){
-for(y in seq_along(kernel_liste)) {
-  print("----------------")
-  print(type_liste[x])
-  print(kernel_liste[y])
-  
-  #nu classification uniquement compatible avec un kernel linéaire
-  if(!( x ==2 && y !=1 )){
-  #one classification pas compatible avec kernel polynomial
-    if(!( x ==3 && y ==2 )){
+#variables
+i = 1
+meilleur_Accuracy = 0
+
+
+#boucles
+for (x in seq_along(type_liste)) {
+  for (y in seq_along(kernel_liste)) {
+    print("----------------")
+    print(type_liste[x])
+    print(kernel_liste[y])
     
-
+    #nu classification uniquement compatible avec un kernel linéaire
+    if (!(x == 2 && y != 1)) {
+      #one classification pas compatible avec kernel polynomial
+      if (!(x == 3 && y == 2)) {
+        
+        
+        #On test toute les combinaisons possibles en appelant notre fonction de création de SVM
+        svm_test <- svm_para(type_liste[x], kernel_liste[y])
+      
+        #On sauvegarde ces performances dans le tableau
+        Tableau_Resultat_SVM[i, ] <-
+          Performances_SVM(svm_test, type_liste[x], kernel_liste[y])
+        
+        #si le modèle a une meilleure Balanced Accuracy que le meilleur actuel, on affecte ce modèle au meilleur.
+       if( Tableau_Resultat_SVM[i,14 ] > meilleur_Accuracy){
+         meilleur_svm <- svm_test
+         meilleur_Accuracy <- Tableau_Resultat_SVM[i,14 ]
+       }
+        
+        
+        i <- i + 1
+      }
+    }
     
-  Tableau_Resultat_SVM[i, ] <- svm_para(type_liste[x],kernel_liste[y])
-i <- i+1}}
-
-}}
-
-
-Tableau_Resultat_SVM
+  }
+}
 
 ```
 
+<br> </br>
+<br> </br>
+
+On obtient alors un tableau avec les performances de chaque modèle et le modèle ayant la Balanced Accuracy la plus haute.
+```{r}
+
+#performance des modèles
+Tableau_Resultat_SVM
+
+#library(tidyverse)
+# result1  <- bind_cols(Tableau_Resultat_SVM[,1:2] , Tableau_Resultat_SVM[,3:4], Tableau_Resultat_SVM[,15])
+# result2  <- bind_cols(Tableau_Resultat_SVM[,1:2] , Tableau_Resultat_SVM[,5:9])
+# result3  <- bind_cols(Tableau_Resultat_SVM[,1:2] , Tableau_Resultat_SVM[,10:14])
+# 
+# result1
+# result2
+# result3
+
+#meilleur modèle
+#meilleur_svm
+```
+## Conclusion
+
+lorem ipsum
 
 
+# Réseau de neurones
 
