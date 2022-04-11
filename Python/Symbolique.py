@@ -11,7 +11,7 @@ nom_column = df_data.columns.tolist()
 
 
 
-#variable booléenne ?
+#variable booléenne 
 def is_binary(list_binary, nom_column):
     if nom_column in list_binary:
         return True
