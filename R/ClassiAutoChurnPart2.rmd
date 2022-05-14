@@ -67,12 +67,21 @@ knitr::opts_chunk$set(echo = TRUE)
 Import des deux jeux de données | format csv 
 ```{r}
 train <-
-  read.csv(file = "churner_train_data_set.csv", header = TRUE, sep = ",")
+  read.csv(file = "sample_churner_train_data_set.csv", header = TRUE, sep = ",")
 #head(train)
 
-test <- read.csv(file = "churner_test_data_set.csv", header = TRUE, sep =
+test <- read.csv(file = "sample_churner_test_data_set.csv", header = TRUE, sep =
                    ",")
 #head(test)
+
+#Suppression d'une partie des lignes pour faire les tests d'éxécution de façon plus rapide (on garde 30%)
+lignes_sup_train <- sample(1:nrow(train), nrow(train)*0.70)
+lignes_sup_test <- sample(1:nrow(test), nrow(test)*0.70)
+train <- train[-lignes_sup_train,]
+test <- test[-lignes_sup_test,]
+
+
+
 ```
 <br> </br>
 Création variables
@@ -81,15 +90,16 @@ train$groupe <- ifelse(train$churner == 1 , TRUE, FALSE)
 test$groupe <- ifelse(test$churner == 1 , TRUE, FALSE)
 ```
 <br> </br>    
-<br> </br>
-<br> </br>
+
 
 # ACP sur Jeu d'entrainement
 <br> </br>
 
-scale.unit: pour choisir de réduire ou non les variables
-ncp: le nombre de dimensions à garder dans les résultats
-graph: pour choisir de faire apparaître les graphiques ou non 
+Le paramètre Scale.uni permet de choisir de réduire ou non les variables.
+
+ncp est le nombre de dimensions à garder dans les résultats
+
+Tandis que graph est le choix de faire apparaître les graphiques ou non 
 ```{r,fig.show='hide',warning=FALSE}
 library(FactoMineR)
 library("factoextra")
@@ -163,6 +173,7 @@ head(vp)
 
 
 
+
 ```
 
 On utilise les valeurs propres pour déterminer le nombre p' d'axes principaux à conserver après l'ACP avec la règle de Kaiser (1961)
@@ -212,7 +223,7 @@ Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
 ## Qualité
 
 <br> </br>
-qualité de répresentation
+Qualité de répresentation
 ```{r,results='hide'}
 sujetVar <- get_pca_var(res.pca)
 
@@ -259,9 +270,11 @@ fviz_pca_ind(
   palette = c("#00AFBB", "#E7B800", "#FC4E07", "#9bcd9b"),
   addEllipses = TRUE,
   ellipse.type = "confidence",
-  legend.title = "continents"
+  legend.title = "Churner"
 )
 ```
+<br> </br>
+<br> </br>
 <br> </br>
 
 # ACP sur jeu de test
@@ -320,13 +333,13 @@ test_SVM$churner <- NULL
 
 <br> </br>
 
-SVM utilisé en tant que classifieur permet de trouver un ligne (R²), un plan (R^3), un hyperplan (R^n) qui sépare les observations en classes.
+Le modèle SVM utilisé en tant que classifieur permet de trouver une ligne (R²), un plan (R^3), un hyperplan (R^n) qui sépare les observations en classes.
 
-Dans le cas du SVM linaéaire binaire on séparer linéairement une Classe +1 et une Classe -1, 
+Dans le cas du SVM linéaire binaire on sépare linéairement une Classe +1 et une Classe -1, 
 Une infinité de solutions est possible pour ces problèmes,on cherche la solution qui maximise la marge et minimise les erreurs.
 
 Cependant lors de la recherche des points supports, les outliers(valeurs abérantes) vont faire perdre toute généralisation au modèle,
-pour contrer cela on accepte alors des erreurs, on change de classe les outliers.
+pour contrer cela on accepte alors un taux d'erreur.
 
 
 <br> </br>
@@ -334,9 +347,6 @@ pour contrer cela on accepte alors des erreurs, on change de classe les outliers
 ## Création SVM
 
 <br> </br>
-ajout d'une colonne temps d'execution dans tableau
-2 tableaux : un ACP, l'autre sans ACP.
-
 
 Fonction création d'un SVM
 ```{r}
@@ -348,14 +358,18 @@ svm_para <- function(type , kernel, x , y)
  #  cl <- makeCluster(8, type = "SOCK") 
   # registerDoSNOW(cl)
 
-  svmfit <- tune.svm(
+ 
+  
+ svmfit <- tune.svm(
     x = x,
     y = y,
     type = type,
     kernel = kernel,
-    cost = c(1,10), #1:10
-    gamma = c(0, 0.5), #seq(0, 0.5, by = 0.1)
-    tunecontrol = tune.control(cross = 2)
+    cost = 100000 ,#c(10,100000), #1:10
+    gamma =10,# c(0,1), #seq(0, 0.5, by = 0.1)
+    tunecontrol = tune.control(cross = 2),
+ # preProc = c("center","scale"), Si l'on souhaite réaliser le SVM sur des données centrée réduite.
+  metric = "Specificity"
   )
   
   
@@ -412,10 +426,6 @@ Performances_SVM <- function(svmfit,type,kernel,tempsSVM,trainJeu,testJeu,collon
 On créé une liste contenant les différentes mesures de performances pour le jeu d'entrainement Et le jeu de test.
 
 Kappa, Sensitivity, Specificity et Balanced Accuracy sont très utiles dans notre cas puisque la proportion des classes est très différentes, ces paramètres nous permettent de mettre en perspective notre Accuracy.
-
-Idée : choisir la spécificité (=/ de sensibilité) pour notre cas ?
-
-http://john-uebersax.com/stat/kappa.htm
 
 <br> </br>
 
@@ -495,11 +505,12 @@ Tableau_Resultat_SVM_sans_ACP <- data.frame(
 On créé deux vecteurs, l'un contenant tout les types de classifieur & l'autre contenant les fonctions kernel possible.
 
 On test toute les combinaisons possibles en appelant notre fonction de création de SVM, puis on évalue le modèle avec la fonction d'évaluation de SVM. On sauvegarde ces performances dans le tableau, et si le modèle a une meilleure Spécificité que le meilleur actuel, on affecte ce modèle au meilleur.
-```{r}
+```{r warning=FALSE}
 #type
-type_liste <- c("C-classification",
-                "nu-classification",
-                "one-classification"
+type_liste <- c("C-classification"
+                #,
+            #    "nu-classification",
+               # "one-classification"
                 #      "eps-regression",
                 #     "nu-regression"
                 )
@@ -542,6 +553,7 @@ for (x in seq_along(type_liste)) {
          meilleur_svm_avec_ACP <- svm_avec_ACP
          meilleur_Accuracy_ACP <- Tableau_Resultat_SVM_avec_ACP[i,13 ]
        }
+        print("Partie ACP terminé")
         # One classification avec kernel radial et sigmoid a un temps de calcul très long (trop) avec la base sans ACP
         if(!(x==3 && y > 2)){
        #Exactement la même chose, mais sans l'ACP effectuée sur les jeux de données
@@ -578,6 +590,12 @@ Tableau_Resultat_SVM_avec_ACP
 #performance des modèles Sans ACP
 Tableau_Resultat_SVM_sans_ACP
 
+
+#Sauvegarde des résultats
+write.csv(Tableau_Resultat_SVM_avec_ACP, file = "Resultat_SVM_Avec_ACP.csv")
+write.csv(Tableau_Resultat_SVM_sans_ACP, file = "Resultat_SVM_Sans_ACP.csv")
+
+
 #library(tidyverse)
 # result1  <- bind_cols(Tableau_Resultat_SVM[,1:2] , Tableau_Resultat_SVM[,3:4], Tableau_Resultat_SVM[,15])
 # result2  <- bind_cols(Tableau_Resultat_SVM[,1:2] , Tableau_Resultat_SVM[,5:9])
@@ -595,19 +613,58 @@ Tableau_Resultat_SVM_sans_ACP
 ```
 ## Conclusion
 
-lorem ipsum
+Après test de nombreuses combinaisons de nos paramètres nous avons pu trouver de très bon modèles, nous remarquons que le temps de calculs est plus faible avec la version ACP (presque 15 fois plus rapide), les résultats sont similaires. On arrive à trouver un modèle à 0.85 de sensibilité et 0.70 de spécificité pour les deux jeux de données : Avec ACP & Sans ACP.
 
 
-# Réseau de neurones
+# Perceptrons
 
 <br> </br>
 
 ## Perceptron simple
 
-Constantes de notre réseau de neurone nnet.
+Préparation jeu de donnée pour le perceptron.
+
+Catégorisons en utilisant un réseau neuronal multicouche avec 24 entrées et 1 sortie. (pour le jeu ACP).
+
+* Vecteur d'entrée : 24 premières dimensions de notre ACP
+* Vecteur de sortie : 1 pour churner, 0 sinon.
+```{r}
+x_ACP = trainACP[,-25]
+y_ACP = matrix(0, nr = length(trainACP[, 1]), nc = 1)
+
+x_sans_ACP  = train_SVM[,-25]
+y_sans_ACP  = matrix(0, nr = length(train_SVM[, 1]), nc = 1)
+
+
+for (i in 1:length(trainACP[, 1])) {
+  if (trainACP[i, 25] == TRUE) {
+    y_ACP[i, ] = 1
+  }
+  else {
+    y_ACP[i, ] = 0
+  }
+  
+}
+
+for (i in 1:length(train_SVM[, 1])) {
+  if (train_SVM[i, 25] == TRUE) {
+    y_sans_ACP[i, ] = 1
+  }
+  else {
+    y_sans_ACP[i, ] = 0
+  }
+  
+}
+
+```
+
+
+<br> </br>
+
+Les constantes de notre réseau de neurone nnet.
 Poids aléatoires initiaux sur [-valInitWgt, valInitWgt]. 
 
-Valeur d'environ 0,5 sauf si les entrées sont grandes, auquel cas elle doit être choisie de manière à ce quevalInitWgt*max(|x|) soit environ 1.
+On a choisit une valeur de 0,6 car les entrées sont moyennes, sinon on aurait choisit tel que valInitWgt*max(|x|) soit environ égale à 1.
 ```{r}
 library(nnet)
 
@@ -617,107 +674,236 @@ valInitWgt=0.6
 linearOutput=FALSE
 
 #   Nombre de neurones sur la couche cachée
-nbNeurons=500
+nbNeuronsList =  3 #c(1,3,5,10,20)
+
+#la fonction objectif minimisée lors de l’apprentissage R(w)+λ∥w∥², faisons varier λle paramètre de régularisation
+reguList <- 10^-5 #c(10^-7,10^-5,10^-3, 0.1)
+
+
 
 # Nombre maximal d'itérations pendant la phase d'apprentissage
-maxLearnIter=1000
+maxLearnIter=500
 
 ```
 <br> </br>
 
-Catégorisons en utilisant un réseau neuronal multicouche avec 24 entrées et 1 sortie.
-# Vecteur d'entrée : 24 premières dimensions de notre ACP
-# Vecteur de sortie : 1 pour churner, 0 sinon.
-```{r}
-x = trainACP[,-25]
-y = matrix(0, nr = length(trainACP[, 1]), nc = 1)
-
-
-for (i in 1:length(trainACP[, 1])) {
-  if (trainACP[i, 25] == TRUE) {
-    y[i, ] = 1
-  }
-  else {
-    y[i, ] = 0
-  }
-  
-}
-
-```
-
-
 
     
-Size décrit le nombre de nœuds qui seront utilisés dans la couche cachée, dans ce cas 500 nœuds sont utilisés. Decay illustre la vitesse de décroissance de la descente de gradient. Maxit est l'itération maximale à effectuer, dans ce cas, l'itération maximale à effectuer est de 1000 itérations.
+Size décrit le nombre de nœuds qui seront utilisés dans la couche cachée, dans ce cas 3 nœuds sont utilisés. Decay illustre la vitesse de décroissance de la descente de gradient. Maxit est l'itération maximale à effectuer, dans ce cas, l'itération maximale à effectuer est de 1000 itérations.
+
+Nous souhaitons observer l'influence du nombre de neurones sur la couche caché
 
 ```{r}
-#faire varier size, decay
 
-rna01 <- nnet(
-  x, 
-  y, 
-  MaxNWts = 10^5,
-  size=nbNeurons, 
-  linout=linearOutput,
-  rang=valInitWgt,
-  decay=0,
-  maxit=maxLearnIter,
-  Hess=TRUE)
+# ResultatsPerceptron <- function(x,y,nbNeuronsList){
+# 
+# 
+# for (Size in nbNeuronsList) {
+#   MeilleurScore <- 10 ^ 5
+#   
+#   
+#   
+#   rna01 <- nnet(
+#     x,
+#     y,
+#     MaxNWts = 10 ^ 5,
+#     size = nbNeurons,
+#     linout = linearOutput,
+#     rang = valInitWgt,
+#     decay = 0,
+#     maxit = maxLearnIter,
+#     Hess = TRUE
+#   )
+#   
+#   
+#   print("===========================")
+#   print("Erreur Perceptron Taille ")
+#   print(Size)
+#   print(rna01$residuals ^ 2)
+#   
+#   
+#   
+#   resultatsPerceptron[[Size]] <- rna01
+# }
+# 
+#   return(resultatsPerceptron)
+#   
+# }
+# 
+# 
+# 
+# Perceptron_Avec_ACP <- ResultatsPerceptron(x_ACP,y_ACP,nbNeuronsList )
+# Perceptron_Sans_ACP<- ResultatsPerceptron(x_sans_ACP,y_sans_ACP,nbNeuronsList )
+
+
 ```
-
+<br> </br>
+On test chaque size de la liste nbNeurons et chaque paramètre de régularisation
 ```{r}
-# Utiliser un réseau neuronal pour prédire les catégories à partir des entrées
-y_rna<- predict(rna01,x)
+
+library(e1071)
+
+Perceptron_Avec_ACP <-
+  tune.nnet(
+    x_ACP,
+    y_ACP,
+    linout = linearOutput,
+    size = nbNeuronsList,
+    decay = reguList,
+    MaxNWts = 10 ^ 5,
+     metric = "Specificity"
+  )
+
+
+Perceptron_Sans_ACP <-
+  tune.nnet(
+    x_sans_ACP,
+    y_sans_ACP,
+    size = nbNeuronsList,
+     decay = reguList,
+    MaxNWts = 10 ^ 5,
+linout = linearOutput,
+ metric = "Specificity"
+  )
+
 ```
+<br> </br>
 
+Affichage des modèles retenus
 ```{r}
+Perceptron_Avec_ACP$best.parameters
+Perceptron_Sans_ACP$best.parameters
 
 
-clust = matrix(FALSE, nr = length(y_rna[, 1]), nc = 1)
+```
+Le meilleur modèle possède les paramètres :  
 
+3 neurones & 1e-05 de decay.
 
-for (i in 1:length(y_rna[, 1])) {
-  index = which.max(y_rna[i,])
-  if (y_rna[i,] == 1) {
-    clust[i, 1] = TRUE
+<br> </br>
+
+Utiliser un réseau neuronal pour prédire les catégories à partir des entrées
+```{r}
+#ACP
+
+y_rna_ACP<- predict(Perceptron_Avec_ACP$best.model,x_ACP)
+clust_ACP = matrix(FALSE, nr = length(y_rna_ACP[, 1]), nc = 1)
+
+for (i in 1:length(y_rna_ACP[, 1])) {
+  index = which.max(y_rna_ACP[i,])
+  if (y_rna_ACP[i,] == 1) {
+    clust_ACP[i, 1] = TRUE
   }
   else {
-    clust[i, 1] = FALSE
+    clust_ACP[i, 1] = FALSE
   }
 }
-
-
 trainACP2 = trainACP
-trainACP2$Cluster = clust
-write.table(trainACP2, file = "trainACP.txt", sep = " ") # save result in text file
+trainACP2$Cluster = clust_ACP
+
+
+#Sans ACP
+y_rna_SANS<- predict(Perceptron_Sans_ACP$best.model,x_sans_ACP)
+clust_SANS = matrix(FALSE, nr = length(y_rna_SANS[, 1]), nc = 1)
+
+for (i in 1:length(y_rna_SANS[, 1])) {
+  index = which.max(y_rna_SANS[i,])
+  if (y_rna_SANS[i,] == 1) {
+    clust_SANS[i, 1] = TRUE
+  }
+  else {
+    clust_SANS[i, 1] = FALSE
+  }
+}
+train_SVM2 = train_SVM
+train_SVM2$Cluster = clust_SANS
+
+#write.table(trainACP2, file = "trainACP.txt", sep = " ") # save result in text file
 
 
 ```
+<br> </br>
 
+Prédiction sur le jeu d'entrainement
+```{r}
+#ACP
+print("Prédiction avec ACP")
+#matrice de confusion
+table(trainACP2[,25])
+table(trainACP2[,26])
+table(trainACP2[,25:26])
+
+#tables de contingences
+table(trainACP2[,25])
+table(trainACP2[,26])
+tres=table(trainACP2[,25:26])
+prop.table(tres,1)
+
+#Sans ACP
+print("Prédiction sans ACP")
+#matrice de confusion
+table(train_SVM2[,132])
+table(train_SVM2[,133])
+table(train_SVM2[,132:133])
+
+#tables de contingences
+table(train_SVM2[,132])
+table(train_SVM2[,133])
+tres=table(train_SVM2[,132:133])
+prop.table(tres,1)
+
+
+
+
+```
+<br> </br>
 
 Prédiction pour les lignes de tests
 ```{r}
-# 
-y_rna2 <- predict(rna01, testACP[,-25])
+#ACP
 
-testACP2 = testACP
-clust2 = matrix(FALSE, nr = length(y_rna2[, 1]), nc = 1)
+y_rna_ACP<- predict(Perceptron_Avec_ACP$best.model,testACP[,-25])
+clust_ACP = matrix(FALSE, nr = length(y_rna_ACP[, 1]), nc = 1)
 
-
-for (i in 1:length(y_rna2[, 1])) {
-  if (y_rna[i, ] == 1) {
-    clust2[i, 1] = TRUE
+for (i in 1:length(y_rna_ACP[, 1])) {
+  index = which.max(y_rna_ACP[i,])
+  if (y_rna_ACP[i,] == 1) {
+    clust_ACP[i, 1] = TRUE
   }
   else {
-    clust2[i, 1] = FALSE
+    clust_ACP[i, 1] = FALSE
   }
 }
-testACP2$Cluster = clust2
+testACP2 = testACP
+testACP2$Cluster = clust_ACP
+
+
+#Sans ACP
+y_rna_SANS<- predict(Perceptron_Sans_ACP$best.model,test_SVM[,-132])
+clust_SANS = matrix(FALSE, nr = length(y_rna_SANS[, 1]), nc = 1)
+
+for (i in 1:length(y_rna_SANS[, 1])) {
+  index = which.max(y_rna_SANS[i,])
+  if (y_rna_SANS[i,] == 1) {
+    clust_SANS[i, 1] = TRUE
+  }
+  else {
+    clust_SANS[i, 1] = FALSE
+  }
+}
+test_SVM2 = test_SVM
+test_SVM2$Cluster = clust_SANS
+
+
 
 
 ```
 
+<br> </br>
+
 ```{r}
+#ACP
+
 #matrice de confusion
 table(testACP2[,25])
 table(testACP2[,26])
@@ -728,42 +914,22 @@ table(testACP2[,25])
 table(testACP2[,26])
 tres=table(testACP2[,25:26])
 prop.table(tres,1)
+
+#Sans ACP
+
+#matrice de confusion
+table(test_SVM2[,132])
+table(test_SVM2[,133])
+table(test_SVM2[,132:133])
+
+#tables de contingences
+table(test_SVM2[,132])
+table(test_SVM2[,133])
+tres=table(test_SVM2[,132:133])
+prop.table(tres,1) #[,1]
 ```
+Les perceptrons obtiennent des résultats peu convaincants, la plupart prédisent l'entiereté des individus comme non-churner, tandis que le meilleur ne prédit qu'à 70% de sensibilité et 65% de spécificité.
 
-## Paramètres à optimiser pour un perceptron
-
-Tune nnet
-```{r}
-Qlist <- 1:10
-iter <- 10
-
-res_tune <- tune.nnet(x, y, tune.control(nrepeat = iter), size = Qlist,
-                      linout = TRUE)
-```
-
-Visualisation évolution performance
-```{r}
-plot(Qlist, res_tune$performances$error, main = "", xlab = "Q", ylab = "erreur",
-     type = "b")
-```
-
-Affichage performance et meilleur modèle
-```{r}
-res_tune$best.parameters
-res_tune$best.performance
-res_tune$best.model
-```
-
-
-
-
-## Réseau de neurones multicouches
-```{r}
-library(keras)
-
-
-
-```
 
 
 
