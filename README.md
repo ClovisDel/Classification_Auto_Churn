@@ -47,4 +47,4 @@ Base de données csv de 99 999 observations pour 226 variables (numériques et n
 - Création modèles,
 - Train & test & evaluation,
 
--
+
