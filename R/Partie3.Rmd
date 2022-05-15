@@ -1,0 +1,271 @@
+---
+title: |
+  ![](images/Neural_Network.png){width=20%} 
+  Partie 3 sur R
+author: 
+- Clovis Deletre
+- Charles Vitry
+date:
+output:
+  rmarkdown::html_document:
+    theme: cerulean
+    number_sections: no
+    toc: yes
+    toc_depth: 5
+    toc_float: true
+---
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 20px;
+  }
+td {  /* Table  */
+  font-size: 8px;
+}
+h1.title {
+  font-size: 55px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 38px;
+  color: DarkBlue;
+}
+h2 { /* Header 2 */
+    font-size: 28px;
+  color: DarkBlue;
+}
+h3 { /* Header 3 */
+  font-size: 35px;
+  font-family: "Times New Roman", Times, serif;
+  color: DarkBlue;
+}
+code.r{ /* Code block */
+    font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#install for export in pdf file
+#tinytex::install_tinytex()
+```
+<br> </br>
+
+```{r include=FALSE}
+library(keras)
+library(tfdatasets)
+library(tidyverse)
+library(rsample)
+library(caret)
+```
+
+
+# Import
+
+<br> </br>
+
+ ▶  Importation du jeu d'entrainement & de test :
+```{r results='hide'}
+library(readr)
+
+df_train <-  read_csv("churner_train_data_set.csv")
+df_test <- read_csv("churner_test_data_set.csv")
+
+df_train_symbo <- read_delim("Train_Var_Symbolique.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
+df_test_symbo <- read_delim("Test_Var_Symbolique.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+df_train_ACP <- read_csv("trainACP.csv")
+df_test_ACP <- read_csv("testACP.csv")
+
+df_train_ACP_symbo  <- read_delim("Train_Var_ACP.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
+df_test_ACP_symbo <- read_delim("Test_Var_ACP.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+```
+<br> </br>
+
+Corrections noms de variables à prédire
+```{r}
+df_train_ACP$...1 <- NULL
+df_test_ACP$...1 <- NULL
+
+names(df_train_ACP)[names(df_train_ACP) == "y"] <- "churner"
+names(df_test_ACP)[names(df_test_ACP) == "y.test"] <- "churner"
+```
+<br> </br>
+
+Choix des jeux de données utilisés
+```{r}
+train <- df_train_ACP
+test <- df_test_ACP
+df <- rbind(train,test)
+```
+
+<br> </br>
+
+Les jeux d’entraînement et de test sont déjà prêt, on créé le jeu de validation à partir du jeu d’entraînement.
+```{r}
+split <- initial_split(train, prop = 4/5)
+train <- training(split)
+val <- testing(split)
+```
+
+<br> </br>
+
+# Analyse quantitative
+
+▶ Analyse de la distribution de la variable "churner"
+```{r}
+ggplot(df_test) +
+  aes(x = churner) +
+  geom_histogram(bins = 5L, fill = "#112446") +
+  labs(
+    x = "Churner",
+    y = "Effectifs",
+    title = "Répartition Churner"
+  ) +
+  theme_gray()
+
+```
+
+# Préparation des batchs
+
+Nous allons séparer en petites parties le jeu de donnée avec tfdatasets. Cela permet de former le modèle plus facilement.
+```{r}
+df_to_dataset <- function(df, shuffle = TRUE, batch_size = 1024) {
+  ds <- df %>% 
+    tensor_slices_dataset()
+  
+  if (shuffle)
+    ds <- ds %>% dataset_shuffle(buffer_size = nrow(df))
+  
+  ds %>% 
+    dataset_batch(batch_size = batch_size)
+}
+
+```
+
+<br> </br> 
+
+```{r}
+batch_size <- 1024
+train_ds <- df_to_dataset(train, batch_size = batch_size)
+val_ds <- df_to_dataset(val, shuffle = FALSE, batch_size = batch_size)
+test_ds <- df_to_dataset(test, shuffle = FALSE, batch_size = batch_size)
+```
+
+<br> </br> 
+Observons la nature des données qui vont être utilisés
+```{r results='hide'}
+train_ds %>% 
+  reticulate::as_iterator() %>% 
+  reticulate::iter_next() %>% 
+  str()
+```
+Il s'agit de la liste des noms de colonnes du dataframe.
+
+<br> </br> 
+Nous souhaitons prédire la variable churner
+```{r}
+spec <- feature_spec(train_ds, churner ~ .)
+spec_prep <- spec
+```
+
+<br> </br> 
+Nos variables sont toutes numériques, on choisit de les normalisé.
+```{r results='hide'}
+spec <- spec %>%
+  step_numeric_column(
+    all_numeric()
+  )
+ spec_prep <- fit(spec)
+ str(spec_prep$dense_features())
+
+```
+# Création du modèle de Deep-Learning
+
+<br> </br> 
+Création du modèle
+```{r}
+model <- keras_model_sequential() %>% 
+  layer_dense_features(dense_features(spec_prep)) %>% 
+  layer_dense(units = 200, activation = "relu") %>% 
+  layer_dropout(0.5) %>%
+  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dropout(0.4) %>%
+  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dropout(0.3) %>%
+  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dropout(0.2) %>%
+  layer_dense(units = 1, activation = 'sigmoid')
+
+
+model %>% compile(
+  loss = loss_binary_crossentropy, 
+  optimizer = "adam", 
+  metrics = "binary_accuracy"
+)
+```
+
+<br> </br> 
+Entrainement du modèle sur le jeu d’entraînement
+```{r}
+history <- model %>% 
+  fit(
+    dataset_use_spec(train_ds, spec = spec_prep),
+    epochs = 100, 
+    validation_data = dataset_use_spec(val_ds, spec_prep),
+    verbose = 2
+  )
+```
+# Visualisation des résultats
+
+<br> </br> 
+Affichage graphique des améliorations de l’entraînement
+```{r}
+plot(history)
+```
+
+<br> </br> 
+Prédiction sur le jeu de test.
+```{r}
+#prédiction
+pred <- predict(model, test)
+test$prediction <- pred
+```
+```{r}
+predictions = matrix(FALSE, nr = nrow(test), nc = 1)
+
+for (i in 1:nrow(test)) {
+  if (test[i, 26] > 0.5) {
+    test[i, 26] = TRUE
+  }
+  else {
+    test[i, 26] = FALSE
+  }
+}
+```
+
+
+```{r}
+#Matrice de confusion
+table(test[,25:26])
+```
+
+
+On remarque que les modèles réalisés avec Keras produisent les mêmes résultats que ceux produits avec Pytorch, avec les mêmes paramètres évidemment.
+
+Les deux librairies étant facile à utiliser et intuitives, il en va de la préférence du langage pour le choix de plateforme.
+
+
+Le modèle pourra être utilisé plus tard.
+```{r}
+save_model_tf(model, "model/ChurnPrediction") 
+```
+
+
+
+

@@ -74,9 +74,9 @@ test <- read.csv(file = "sample_churner_test_data_set.csv", header = TRUE, sep =
                    ",")
 #head(test)
 
-#Suppression d'une partie des lignes pour faire les tests d'éxécution de façon plus rapide (on garde 30%)
-lignes_sup_train <- sample(1:nrow(train), nrow(train)*0.70)
-lignes_sup_test <- sample(1:nrow(test), nrow(test)*0.70)
+#Suppression d'une partie des lignes pour faire les tests d'éxécution & génération de l'html de façon plus rapide (on garde 10%)
+lignes_sup_train <- sample(1:nrow(train), nrow(train)*0.90)
+lignes_sup_test <- sample(1:nrow(test), nrow(test)*0.90)
 train <- train[-lignes_sup_train,]
 test <- test[-lignes_sup_test,]
 
@@ -185,7 +185,7 @@ On utilise les valeurs propres pour déterminer le nombre p' d'axes principaux �
 
 
 <br> </br>
-Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
+Ici on prend les 24 premières composantes pour former nos 24 axes principaux
 
 ```{r}
 # #res.pca$ind$coord
@@ -223,7 +223,7 @@ Ici on prend les 24 premières compostantes pour former nos 24 axes principaux
 ## Qualité
 
 <br> </br>
-Qualité de répresentation
+Qualité de représentation
 ```{r,results='hide'}
 sujetVar <- get_pca_var(res.pca)
 
@@ -259,7 +259,7 @@ fviz_contrib(res.pca,
 
 
 
-Tracage d'ellypse de confiance
+Traçage d’ellipse de confiance
 ```{r}
 
 
@@ -281,7 +281,7 @@ fviz_pca_ind(
 
 <br> </br>
 
-On projette les données du jeu test avec l'ACP effectué sur le jeu d'entrainement.
+On projette les données du jeu test avec l'ACP effectué sur le jeu d’entraînement.
 ```{r}
 library(ade4)
 ACPsurTest <- suprow(res.pca, test[,2:132])$lisup
@@ -302,7 +302,7 @@ fviz_add(plot, ACPsurTest, color ="purple")
 
 On obtient une base train de 24 variables pour 79999 observations
 
-On prépare les bases d'entrainements et de tests pour le SVM, avec et sans ACP.
+On prépare les bases d’entraînements et de tests pour le SVM, avec et sans ACP.
 ```{r}
 #AVEC ACP
 trainACP <- as.data.frame(
@@ -320,10 +320,34 @@ train_SVM <- train[,-1]
 test_SVM <- test[,-1]
 train_SVM$churner <- NULL
 test_SVM$churner <- NULL
+# groupe_train <- train_SVM$groupe
+# groupe_test <- test_SVM$groupe
 
 ```
 <br> </br>
 
+On centre-réduit les données sur lequels nous n'avons pas effectuer d'ACP
+```{r warning=FALSE,error=TRUE}
+# ## Calculs de la moyenne et de l'écart type pour chaque collonne du jeu de test
+# train_SVM_Moyenne <- apply(train_SVM,2,mean)
+# train_SVM_EcartType <- apply(train_SVM,2,sd)
+# 
+# ## On centre réduit avec la moyenne et l'écart type du jeu d'entrainement
+# train_SVM <- sweep(sweep(train_SVM, 2L, train_SVM_Moyenne), 2, train_SVM_EcartType, "/")
+# test_SVM <- sweep(sweep(test_SVM, 2L, train_SVM_Moyenne), 2, train_SVM_EcartType, "/")
+#La variable à prédire a été aussi centrée réduite, corrigons cela
+# train_SVM$groupe <- groupe_train
+# test_SVM$groupe <- groupe_test
+
+#Utilisation plus facile avec la fonction predict
+Centree_reduit <- preProcess(train_SVM[,-132])
+test_SVM[,-132] <- predict(Centree_reduit, test_SVM[,-132])
+train_SVM[,-132] <- predict(Centree_reduit, train_SVM[,-132])
+
+```
+
+
+<br> </br>
 
 # SVM
 
@@ -333,12 +357,12 @@ test_SVM$churner <- NULL
 
 <br> </br>
 
-Le modèle SVM utilisé en tant que classifieur permet de trouver une ligne (R²), un plan (R^3), un hyperplan (R^n) qui sépare les observations en classes.
+Le modèle SVM utilisé en tant que classificateur permet de trouver une ligne (R²), un plan (R^3), un hyperplan (R^n) qui sépare les observations en classes.
 
 Dans le cas du SVM linéaire binaire on sépare linéairement une Classe +1 et une Classe -1, 
 Une infinité de solutions est possible pour ces problèmes,on cherche la solution qui maximise la marge et minimise les erreurs.
 
-Cependant lors de la recherche des points supports, les outliers(valeurs abérantes) vont faire perdre toute généralisation au modèle,
+Cependant lors de la recherche des points supports, les outliers(valeurs aberrantes) vont faire perdre toute généralisation au modèle,
 pour contrer cela on accepte alors un taux d'erreur.
 
 
@@ -379,7 +403,7 @@ svm_para <- function(type , kernel, x , y)
   return (svmfit)
 }
 ```
-les paramètres différentiant les SVM : le type de classifieur & la fonction kernel utilisé.
+les paramètres différenciant les SVM : le type de classificateur & la fonction kernel utilisé.
 
 <br> </br>
 
@@ -423,7 +447,7 @@ Performances_SVM <- function(svmfit,type,kernel,tempsSVM,trainJeu,testJeu,collon
   return (Resultat)
 }
 ```
-On créé une liste contenant les différentes mesures de performances pour le jeu d'entrainement Et le jeu de test.
+On créé une liste contenant les différentes mesures de performances pour le jeu d’entraînement Et le jeu de test.
 
 Kappa, Sensitivity, Specificity et Balanced Accuracy sont très utiles dans notre cas puisque la proportion des classes est très différentes, ces paramètres nous permettent de mettre en perspective notre Accuracy.
 
@@ -502,7 +526,7 @@ Tableau_Resultat_SVM_sans_ACP <- data.frame(
 
 
 <br> </br>
-On créé deux vecteurs, l'un contenant tout les types de classifieur & l'autre contenant les fonctions kernel possible.
+On créé deux vecteurs, l'un contenant tout les types de classificateur & l'autre contenant les fonctions kernel possible.
 
 On test toute les combinaisons possibles en appelant notre fonction de création de SVM, puis on évalue le modèle avec la fonction d'évaluation de SVM. On sauvegarde ces performances dans le tableau, et si le modèle a une meilleure Spécificité que le meilleur actuel, on affecte ce modèle au meilleur.
 ```{r warning=FALSE}
@@ -613,8 +637,17 @@ write.csv(Tableau_Resultat_SVM_sans_ACP, file = "Resultat_SVM_Sans_ACP.csv")
 ```
 ## Conclusion
 
-Après test de nombreuses combinaisons de nos paramètres nous avons pu trouver de très bon modèles, nous remarquons que le temps de calculs est plus faible avec la version ACP (presque 15 fois plus rapide), les résultats sont similaires. On arrive à trouver un modèle à 0.85 de sensibilité et 0.70 de spécificité pour les deux jeux de données : Avec ACP & Sans ACP.
+Après test de nombreuses combinaisons de nos paramètres nous avons pu trouver de bon modèles, nous remarquons que le temps de calculs est plus faible avec la version ACP (presque 15 fois plus rapide), les résultats sont similaires. 
 
+Nous pouvons obtenir des résultats équivalents que nos données soit bruts, Centrée-réduite, ou Composantes principales, mais la différence de temps d'éxécution donne l'avantage aux composantes principales. 
+
+Nous avons pu obtenir un modèle avec 0.9 de sensibilité et 0.5 de spécificité pour chacun des jeux de données, cela permettrait de bien prédire les non-churner et de toucher la moitié des churners. Il est possible de le mettre en production car il prédit correctement les non-churner, mais la prédiction d'uniquement 50% des churners n'est pas suffisante.
+
+Ces métrics ont été obtenu sur le jeu de test de 15 0000 lignes grâce aux hyperparamètres suivants :
+
+* ACP : C-Classification, polynomial, cost : 10 000, gamma : 20
+
+* Non-ACP C-Classification, polynomial, cost : 100000, gamma : 10
 
 # Perceptrons
 
@@ -676,7 +709,7 @@ linearOutput=FALSE
 #   Nombre de neurones sur la couche cachée
 nbNeuronsList =  3 #c(1,3,5,10,20)
 
-#la fonction objectif minimisée lors de l’apprentissage R(w)+λ∥w∥², faisons varier λle paramètre de régularisation
+#la fonction objectif minimisée lors de l’apprentissage R(w)+λ∥w∥², faisons varier λ le paramètre de régularisation
 reguList <- 10^-5 #c(10^-7,10^-5,10^-3, 0.1)
 
 
@@ -824,7 +857,7 @@ train_SVM2$Cluster = clust_SANS
 ```
 <br> </br>
 
-Prédiction sur le jeu d'entrainement
+Prédiction sur le jeu d’entraînement
 ```{r}
 #ACP
 print("Prédiction avec ACP")
@@ -928,8 +961,7 @@ table(test_SVM2[,133])
 tres=table(test_SVM2[,132:133])
 prop.table(tres,1) #[,1]
 ```
-Les perceptrons obtiennent des résultats peu convaincants, la plupart prédisent l'entiereté des individus comme non-churner, tandis que le meilleur ne prédit qu'à 70% de sensibilité et 65% de spécificité.
-
+Les perceptrons obtiennent des résultats peu convaincants, la plupart prédisent l’entiéreté des individus comme non-churner, tandis que le meilleur ne prédit qu'à 70% de sensibilité et 65% de spécificité. On remarque de meilleurs résultat avec les jeux de données ACP et les données bruts, tandis que les modèles réalisés avec les données centrée-réduite ont systématiquement une spécificité nulle.
 
 
 
