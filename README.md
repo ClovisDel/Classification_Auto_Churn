@@ -1,50 +1,50 @@
 # :school: Classification_Auto_Churn :school:
 
-## Machine learning avec R & Python
+## Machine learning with R & Python
 
-Lien des différentes bases : [ici](https://drive.google.com/drive/u/0/folders/1hfs31nPxfJgF0WdZBHp-DUmQwSnNMnqa)
-
-***
-
-## Contexte : 
-
-Le problème posé s’intéresse à la notion de « churner ». Un churner désigne la fin d’un accord entre un client et une entreprise. Dans ce cadre, il est important de détecter à l’avance, si un client à de fort risque de rompre son contrat avec une société et de mettre en place des moyens commerciales de le garder. 
-
-Un point notable est de faire attention aux différentes offres que l’on met en places. D’une part il faut éviter de fournir des offres à des clients qui ne sont pas des futurs churner (moins rentable, mal vu, perte de temps…) et de fait, prioriser l’action sur les clients churner. D’autre part il ne faut pas les détecteurs au dernier moment. Cela permet de se laisser une marge de temps pour regagner la confiance du client. C’est pourquoi les données fournis se basent sur 4 mois consécutifs divisant le cycle de vie du lient en trois phases (bonne / action / résiliation). 
-
-En somme, nous devons réussir à prédire, grâce à des outils de machine learning, quels clients sont fortement susceptible de quitter l’entreprise en priorisant la prédiction des churner à celle des non-churner par l’utilisation de la métrique spécificité. 
+Link to dataset : [here](https://drive.google.com/drive/u/0/folders/1hfs31nPxfJgF0WdZBHp-DUmQwSnNMnqa)
 
 ***
 
-## Données :
+## Context : 
 
-Base de données csv de 99 999 observations pour 226 variables (numériques et non numériques). 
+The problem deals with the notion of “churner”. A churner refers to the end of an agreement between a customer and a company. In this context, it is important to detect in advance, if a customer has a high risk of breaking his contract with a company and to make commercial benefit to keep it. 
+
+A notable point is to pay attention to the different offers that we make. On the one hand, it is necessary to avoid providing offers to customers who are not future churners (less profitable, frowned upon, waste of time, etc.) and in fact, prioritize action on churner customers. On the other hand, detectors should not be used at the last moment. This allows you to leave a margin of time to regain the customer's trust. This is why the data provided is based on 4 consecutives months dividing the life cycle of the client into three phases (good / action / termination). 
+
+In short, we must succeed in predicting, using machine learning tools, which customers are highly likely to leave the company by prioritizing the prediction of churners over that of non-churners by using the specificity metric. 
 
 ***
 
-## 1ère partie : Préparation des données (Python):
+## Data :
 
-- Variables numériques,
-- Suppression des doublons,
-- Transformations des valeurs manquantes,
-- Gestion des outliers, 
-- Création de la variable à expliquer,
-- Gestion de la distribution irrégulière,
+Csv database of 99,999 observations for 226 variables (numeric and non-numeric).
+
+***
+
+## 1st part : Data Management (Python):
+
+- Numerical variables,
+- Removal of duplicates,
+- Transformation of missing values,
+- Outlier management,
+- Creation of the variable "churner",
+- Management of irregular distribution,
 - Split Train/Test.
 
-## 2ème partie : ACP & SVM & Perceptron (Python & R):
+## 2nd part : ACP & SVM & Perceptron (Python & R):
 
-- Réduction dimensionnelle de la base avec ACP,
-- Classifieur SVM,
-- Tuning du SVM,
+- Dimensional reduction of the dataset with ACP,
+- SVM classifier,
+- SVM tuning,
 - Perceptron,
-- Analyse.
+- Analyses.
 
-## 3ème partie : Deep Learning / MLP (Python (Pytorch) & R):
+## 3rd part : Deep Learning / MLP (Python (Pytorch) & R):
 
 - Colab,
-- Initiation à Pytorch,
-- Création modèles,
+- Introduction to Pytorch,
+- Creation of models,
 - Train & test & evaluation,
 
 
